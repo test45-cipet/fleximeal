@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FlexiMeal - User Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f7f9fc; }
+    .header { display: flex; justify-content: space-between; align-items: center; }
+    button { padding: 8px 15px; border: none; border-radius: 6px; cursor: pointer; background: #dc3545; color: white; }
+    button:hover { background: #c82333; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>Welcome to FlexiMeal</h2>
+    <button onclick="logout()">Logout</button>
+  </div>
+  <p>You are logged in as a user. More features (meal trade, payments, etc.) can be added here.</p>
+
+  <script>
+    function logout() {
+      localStorage.clear();
+      window.location.href = "index.html";
+    }
+  </script>
+</body>
+</html>

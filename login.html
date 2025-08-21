@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FlexiMeal - Login</title>
+  <style>
+    body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #eef2f7; }
+    .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 300px; }
+    h2 { text-align: center; }
+    input, button { width: 100%; padding: 10px; margin: 8px 0; border-radius: 8px; border: 1px solid #ccc; }
+    button { background: #007bff; color: white; border: none; cursor: pointer; }
+    button:hover { background: #0069d9; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Login</h2>
+    <input type="email" id="email" placeholder="Email" required>
+    <input type="password" id="password" placeholder="Password" required>
+    <button onclick="login()">Login</button>
+    <p id="message"></p>
+    <a href="signup.html">Don’t have an account? Sign Up</a>
+  </div>
+
+  <script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzJo0-Mlg-oqHrT_2sIp5lVUh8s-YQ845WYwelB-VAf9AHeR6Rb9VpnjGNYgaH1wmodHA/exec"; // Replace with Apps Script Web App URL
+
+
+async function login() {
+  let data = {
+    action: "login",
+    email: document.getElementById("email").value.trim(),
+    password: document.getElementById("password").value.trim()
+  };
+  console.log("Sending data:", data); // Debug log
+  if (!data.email || !data.password) {
+    document.getElementById("message").innerText = "Please fill all fields.";
+    return;
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(data.email)) {
+    document.getElementById("message").innerText = "Invalid email format.";
+    return;
+  }
+  try {
+    let res = await fetch(SCRIPT_URL, {
+      method: "POST",
+      body: new URLSearchParams(data).toString(),
+      headers: { "Content-Type": "application/x-www-form-urlencoded" }
+    });
+    if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+    let result = await res.json();
+    console.log("Response:", result); // Debug log
+    if (result.success) {
+      localStorage.setItem("role", result.role);
+      localStorage.setItem("email", result.email);
+      if (result.role === "admin") window.location.href = "admin.html";
+      else window.location.href = "user.html";
+    } else {
+      document.getElementById("message").innerText = result.message;
+    }
+  } catch (error) {
+    document.getElementById("message").innerText = "Error: " + error.message;
+    console.error("Error:", error);
+  }
+}
+  </script>
+</body>
+</html>
