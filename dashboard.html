@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>User Dashboard - FLEXIMEAL</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h2>User Dashboard</h2>
+  <button onclick="logout()">Logout</button>
+  <div class="block">
+    <h3>Buy Food</h3>
+    <button onclick="buyFood()">Buy</button>
+  </div>
+  <div class="block">
+    <h3>Refund</h3>
+    <form id="refundForm">
+      <select name="meal">
+        <option>Breakfast</option>
+        <option>Lunch</option>
+        <option>Dinner</option>
+      </select>
+      <input type="email" name="email" placeholder="Email" required>
+      <button type="submit">Refund</button>
+    </form>
+  </div>
+  <div class="block">
+    <h3>Discounted Food</h3>
+    <button onclick="viewDiscounts()">View Discounts</button>
+  </div>
+  <div class="block">
+    <h3>Advertisements</h3>
+    <p>Ad content here...</p>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

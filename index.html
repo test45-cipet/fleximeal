@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>FlexiMeal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+   <img src="logo.jpg"height="20%"width="20%"></img><h1>FlexiMeal</h1>
+    <nav>
+      <a href="#" id="nav-index">Home</a>
+      <a href="#" id="nav-signup">Signup</a>
+      <a href="#" id="nav-login">Login</a>
+      <a href="#" id="nav-contact">Contact</a>
+      <a href="#" id="nav-privacy">Privacy</a>
+      <a href="#" id="nav-refundpolicy">Refund Policy</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <!-- Home -->
+    <section id="home" class="page">
+      <h2>Welcome to FlexiMeal</h2>
+      <style>
+      body {
+      font-family: Arial, sans-serif;
+      margin: 0; padding: 0;
+      background: #f8f9fa;
+      color: #333;
+      text-align: center;
+      }
+      header {
+      background: #4CAF50;
+      color: white;
+      padding: 20px;
+      }
+      header h1 {
+      margin: 0;
+      font-size: 2.5rem;
+      }
+      header p {
+      margin: 5px 0 0;
+      }
+      .container {
+      padding: 40px 20px;
+      }
+      .features {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-top: 30px;
+      }
+      .feature {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      width: 250px;
+      }
+      .feature img {
+      width: 60px;
+      margin-bottom: 15px;
+      }
+      .buttons {
+      margin-top: 30px;
+      }
+      .buttons a {
+      display: inline-block;
+      margin: 10px;
+      padding: 12px 25px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: bold;
+      color: white;
+      background: #4CAF50;
+      transition: 0.3s;
+      }
+      .buttons a:hover {
+      background: #388e3c;
+      }
+      footer {
+      margin-top: 100%;
+      background: #333;
+      color: white;
+      padding: 10%;
+      }
+      </style>
+      </head>
+      <body>
+      <header>
+      <h1>🍽️ FlexiMeal</h1>
+      <p>Save Meals • Save Money • Reduce Waste</p>
+      </header>
+      
+      <div class="container">
+      <h2>Welcome to FlexiMeal</h2>
+      <p>CIPET IPT Ahmedabad’s smart solution for hostel mess meals</p>
+      
+      <div class="features">
+      <div class="feature">
+      <img src="https://cdn-icons-png.flaticon.com/512/1046/1046784.png" alt="Trade">
+      <h3>Trade Meals</h3>
+      <p>Sell or buy unused mess meals at lower cost.</p>
+      </div>
+      <div class="feature">
+      <img src="https://cdn-icons-png.flaticon.com/512/1904/1904425.png" alt="Save Money">
+      <h3>Save Money</h3>
+      <p>Buy meals cheaper, earn back from unused ones.</p>
+      </div>
+      <div class="feature">
+      <img src="https://cdn-icons-png.flaticon.com/512/2903/2903152.png" alt="Reduce Waste">
+      <h3>Reduce Waste</h3>
+      <p>Help mess staff cook the right quantity, avoid wastage.</p>
+      </div>
+      </div>
+   
+      
+      
+      <p>Save meals. Save money. Choose and pay via UPI (UTR verification).</p>
+      <div class="buttons">
+      <button id="btn-signup" class="buttons">Signup</button>
+      <button id="btn-login" class="buttons">Login</button>
+      <div>
+      
+    </section>
+
+    <!-- Signup -->
+    <section id="signup" class="page hidden">
+      <h2>Signup</h2>
+      <form id="signupForm">
+        <label>Name <input name="name" required></label>
+        <label>Email <input name="email" type="email" required></label>
+        <label>College <input name="college" required></label>
+        <label>Password <input name="password" type="password" required minlength="6"></label>
+        <label>UPI ID (for refunds/payments) <input name="upi" placeholder="example@bank" required></label>
+        <button type="submit">Create account</button>
+      </form>
+      <p>Already have account? <a href="#" id="link-to-login">Login</a></p>
+    </section>
+
+    <!-- Login -->
+    <section id="login" class="page hidden">
+      <h2>Login</h2>
+      <form id="loginForm">
+        <label>User ID <input name="userid" required></label>
+        <label>Password <input name="password" type="password" required></label>
+        <button type="submit">Login</button>
+      </form>
+      <p><a href="#" id="forgotPwd">Forgot password?</a></p>
+    </section>
+
+    <!-- Dashboard -->
+    <section id="dashboard" class="page hidden">
+      <h2>Dashboard — <span id="dash-userid"></span></h2>
+      <button id="logout">Logout</button>
+
+      <div class="grid">
+        <div class="block" id="block-buy">
+          <h3>Buy Food</h3>
+          <label>Choose type
+            <select id="buy-type">
+              <option value="monthly">Monthly</option>
+              <option value="days">Number of days</option>
+            </select>
+          </label>
+          <label>Quantity <input id="buy-qty" type="number" min="1" value="1"></label>
+          <label>Amount (auto)</label>
+          <div id="buy-amount">₹0</div>
+          <label>Email (for record) <input id="buy-email" type="email"></label>
+          <button id="btn-pay">Pay via UPI</button>
+          <div id="pay-result"></div>
+        </div>
+
+        <div class="block" id="block-refund">
+          <h3>Request Refund (half amount)</h3>
+          <label>Meal
+            <select id="refund-meal">
+              <option value="breakfast">Breakfast</option>
+              <option value="lunch">Lunch</option>
+              <option value="dinner">Dinner</option>
+            </select>
+          </label>
+          <label>Quantity <input id="refund-qty" type="number" min="1" value="1"></label>
+          <label>Reason (optional) <input id="refund-email" placeholder="email for notification"></label>
+          <button id="btn-request-refund">Request Refund</button>
+          <div id="refund-result"></div>
+        </div>
+
+        <div class="block" id="block-buy-refunded">
+          <h3>Buy Refunded Food (discounted by admin)</h3>
+          <div id="refunded-list">— No items available —</div>
+        </div>
+
+        <div class="block" id="block-ads">
+          <h3>Sponsored</h3>
+          <div id="ads">Place your ad here</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Static pages -->
+    <section id="contact" class="page hidden">
+      <h2>Contact Us</h2>
+      <form id="contactForm">
+        <input name="name" required placeholder="Your name">
+        <input name="email" type="email" required placeholder="your@example.com">
+        <textarea name="message" required placeholder="Message"></textarea>
+        <button type="submit">Send</button>
+      </form>
+    </section>
+
+    <section id="privacy" class="page hidden">
+      <h2>Privacy Policy</h2>
+      <p>Basic privacy policy text…</p>
+    </section>
+
+    <section id="refundpolicy" class="page hidden">
+      <h2>Refund Policy</h2>
+      <p>Refund rules — half refund for cancelled meals, admin verifies UTR.</p>
+    </section>
+  </main>
+<footer>
+      <p>© 2025 FlexiMeal | CIPET IPT Ahmedabad </p>
+ </footer>
+  <script src="app.js"></script>
+</body>
+</html> <script src="app.js"></script>
+</body>
+</html>

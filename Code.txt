@@ -1,0 +1,229 @@
+const SPREADSHEET_ID = '1x2R1MMi11tWtTOrrxBJ8zUO3_TGFIZqhb_2fvTEZvqo';
+
+function doPost(e){
+  try{
+    const data = JSON.parse(e.postData.contents);
+    switch(data.action){
+      case 'signup': return signup(data);
+      case 'login': return login(data);
+      case 'getPrice': return getPrice(data);
+      case 'submitPayment': return submitPayment(data);
+      case 'requestRefund': return requestRefund(data);
+      case 'getDashboard': return getDashboard(data);
+      case 'buyRefunded': return buyRefunded(data);
+      case 'contact': return contact(data);
+      case 'resetByUserId': return resetByUserId(data);
+      case 'consumeReset': return consumeReset(data);
+      // admin
+      case 'adminList': return adminList(data);
+      case 'adminUpdate': return adminUpdate(data);
+      default: return json({success:false,message:'Unknown action'});
+    }
+  }catch(err){ return json({success:false,message:String(err)}); }
+}
+
+// ===== Helpers =====
+function ss(){ return SpreadsheetApp.openById(SPREADSHEET_ID); }
+function J(o){ return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
+function json(o){ return J(o); }
+function sha256(s){ return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, s).map(b=>('0'+(b & 0xFF).toString(16)).slice(-2)).join(''); }
+function settings(){
+  const rows = ss().getSheetByName('Settings').getDataRange().getValues();
+  const m={}; for(let i=0;i<rows.length;i++){ const k=rows[i][0]; const v=rows[i][1]; if(k) m[String(k).trim()] = v; }
+  return m;
+}
+function setting(k, d){ const s=settings(); return (k in s)? s[k] : d; }
+function adminGuard(data){ const t = data.adminToken||''; const tok = String(setting('ADMIN_TOKEN','')); if(!tok || t!==tok) throw new Error('Admin token invalid'); }
+function nowIST(){ return new Date(Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy-MM-dd'T'HH:mm:ss')) }
+function withinWindow(meal){
+  const key = 'WINDOW_'+ meal.toUpperCase();
+  const win = String(setting(key,'')); if(!win) return true;
+  const parts = win.split('-'); if(parts.length!==2) return true;
+  const [sh,sm] = parts[0].split(':').map(Number); const [eh,em] = parts[1].split(':').map(Number);
+  const now = nowIST();
+  const start = new Date(now); start.setHours(sh||0, sm||0, 0, 0);
+  const end = new Date(now); end.setHours(eh||0, em||0, 0, 0);
+  return now>=start && now<=end;
+}
+
+// ===== Public API =====
+function signup(d){
+  const U = ss().getSheetByName('Users');
+  if(!d.name || !d.email || !d.college || !d.password || !d.upi) return json({success:false,message:'All fields required'});
+  if(String(d.email).indexOf('@')<0) return json({success:false,message:'Email invalid'});
+  const userid = 'FLEXI-' + Date.now().toString().slice(-6);
+  U.appendRow([userid, d.name, d.email, d.college, sha256(d.password), d.upi, 'pending', new Date(), '']);
+  const token = createResetToken(userid);
+  const resetUrl = ScriptApp.getService().getUrl().replace(/\?$|$/, '?') + 'token='+token;
+  MailApp.sendEmail(d.email, 'FlexiMeal — account created', `Your user id: ${userid}
+Reset link (1 hour): ${resetUrl}`);
+  return json({success:true,message:'Account created. Check your email for User ID.'});
+}
+
+function login(d){
+  const rows = ss().getSheetByName('Users').getDataRange().getValues();
+  const hash = sha256(d.password||'');
+  for(let i=1;i<rows.length;i++){
+    if(rows[i][0]===d.userid && rows[i][4]===hash){
+      if(rows[i][6] !== 'approved') return json({success:false,message:'Account not approved by admin yet.'});
+      return json({success:true, userid:d.userid});
+    }
+  }
+  return json({success:false,message:'Invalid credentials.'});
+}
+
+function getPrice(d){
+  const s = settings();
+  const type = (d.mealType||'monthly').toUpperCase();
+  const price = Number(s['PRICE_'+type]||s['PRICE_DEFAULT']||100);
+  const qty = Number(d.qty||1);
+  return json({success:true, amount: price*qty, merchantUpi: String(s['MERCHANT_UPI']||'fleximeal@bank')});
+}
+
+function submitPayment(d){
+  const P = ss().getSheetByName('Payments');
+  const nextRow = P.getLastRow()+1;
+  // ID as row index for admin convenience
+  P.appendRow([nextRow, new Date(), d.userid, d.email||'', d.amount, d.qty||1, d.upiTo, d.utr, 'pending', d.note||'', d.related_refund_id||'']);
+  MailApp.sendEmail(setting('ADMIN_EMAIL', Session.getActiveUser().getEmail()), 'New payment pending', `User ${d.userid} submitted payment of ₹${d.amount} with UTR ${d.utr}`);
+  return json({success:true,message:'Payment recorded; admin will verify UTR.'});
+}
+
+function requestRefund(d){
+  if(!withinWindow(d.meal)) return json({success:false,message:'Not in allowed time window for '+d.meal});
+  const s = settings();
+  const price = Number(s['PRICE_'+String(d.meal).toUpperCase()]||0);
+  const per = Math.round(price/2*100)/100;
+  const R = ss().getSheetByName('Refunds');
+  const nextRow = R.getLastRow()+1;
+  R.appendRow([nextRow, new Date(), d.userid, d.meal, Number(d.qty||1), per, d.email||'', 'requested', '']);
+  MailApp.sendEmail(setting('ADMIN_EMAIL', Session.getActiveUser().getEmail()), 'Refund requested', `User ${d.userid} requested refund ${d.qty}x ${d.meal} — ₹${per} each`);
+  return json({success:true,message:'Refund request submitted.'});
+}
+
+function getDashboard(d){
+  const R = ss().getSheetByName('Refunds').getDataRange().getValues();
+  const list=[];
+  for(let i=1;i<R.length;i++){
+    const row=R[i];
+    if(row[7]==='available' && row[2]!==d.userid && row[4]>0){
+      list.push({rowId:'R'+row[0], meal:row[3], qty:row[4], discountedPrice:row[5]});
+    }
+  }
+  const adsSheet = ss().getSheetByName('Ads');
+  const adsHtml = adsSheet ? (adsSheet.getRange(1,1).getValue()||'') : '';
+  return json({success:true, refunded:list, adsHtml});
+}
+
+function buyRefunded(d){
+  const R = ss().getSheetByName('Refunds');
+  const id = Number(String(d.rowId).replace('R',''));
+  const rng = R.getRange(id+1,1,1,9); // include status/qty/etc
+  const row = rng.getValues()[0];
+  const meal = row[3];
+  if(!withinWindow(meal)) return json({success:false,message:'Not in allowed time window for '+meal});
+  let qty = Number(row[4]);
+  if(row[7] !== 'available' || qty<=0) return json({success:false,message:'Item not available'});
+  // reserve one
+  qty = qty - 1; R.getRange(id+1,5).setValue(qty); if(qty<=0) R.getRange(id+1,8).setValue('consumed');
+  const P = ss().getSheetByName('Payments');
+  const nextRow = P.getLastRow()+1;
+  P.appendRow([nextRow, new Date(), d.userid, '', row[5], 1, setting('MERCHANT_UPI','fleximeal@bank'), '', 'pending', 'bought_refund', d.rowId]);
+  return json({success:true,message:'Reserved 1 item. Pay via UPI and submit UTR from dashboard.'});
+}
+
+function contact(d){
+  MailApp.sendEmail(setting('ADMIN_EMAIL', Session.getActiveUser().getEmail()), 'Contact from website', `Name: ${d.name}
+Email: ${d.email}
+
+${d.message}`);
+  return json({success:true,message:'Message sent — thanks!'});
+}
+
+// ===== Reset password =====
+function createResetToken(userid){
+  const T = ss().getSheetByName('Tokens');
+  const token = Utilities.getUuid();
+  const expiry = new Date(Date.now()+60*60*1000);
+  T.appendRow([token, userid, expiry, 0]);
+  return token;
+}
+function resetByUserId(d){
+  const token = createResetToken(d.userid);
+  const url = (ScriptApp.getService().getUrl().replace(/\?$|$/, '?')) + 'token='+token;
+  // email address lookup
+  const U = ss().getSheetByName('Users').getDataRange().getValues();
+  let email=''; for(let i=1;i<U.length;i++){ if(U[i][0]===d.userid){ email=U[i][2]; break; }}
+  if(email) MailApp.sendEmail(email, 'FlexiMeal — password reset', `Reset link (1 hour): ${url}`);
+  return json({success:true,message:'If your User ID exists, a reset link was emailed.'});
+}
+function consumeReset(d){
+  const T = ss().getSheetByName('Tokens').getDataRange().getValues();
+  const now = new Date();
+  for(let i=1;i<T.length;i++){
+    if(T[i][0]===d.token && !T[i][3] && T[i][2] >= now){
+      const userid = T[i][1];
+      // set new password
+      const U = ss().getSheetByName('Users');
+      const rows = U.getDataRange().getValues();
+      for(let r=1;r<rows.length;r++) if(rows[r][0]===userid){ U.getRange(r+1,5).setValue(sha256(d.password)); break; }
+      // mark token used
+      ss().getSheetByName('Tokens').getRange(i+1,4).setValue(1);
+      return json({success:true,message:'Password updated. You can login now.'});
+    }
+  }
+  return json({success:false,message:'Invalid or expired token.'});
+}
+
+// ===== Admin API =====
+function adminList(d){
+  adminGuard(d);
+  const S=settings();
+  const U = ss().getSheetByName('Users').getDataRange().getValues();
+  const P = ss().getSheetByName('Payments').getDataRange().getValues();
+  const R = ss().getSheetByName('Refunds').getDataRange().getValues();
+  // build User -> UPI map for refund convenience
+  const map={}; for(let i=1;i<U.length;i++){ map[U[i][0]] = U[i][5]; }
+  // attach row index to P/R for quick updates
+  for(let i=1;i<P.length;i++){ P[i]._rowIndex = i; }
+  for(let i=1;i<R.length;i++){ R[i]._rowIndex = i; }
+  return json({success:true, settings:S, users:U.slice(1), payments:P.slice(1), refunds:R.slice(1), userUpiMap:map});
+}
+function adminUpdate(d){
+  adminGuard(d);
+  const shU = ss().getSheetByName('Users');
+  const shP = ss().getSheetByName('Payments');
+  const shR = ss().getSheetByName('Refunds');
+  const shS = ss().getSheetByName('Settings');
+  switch(d.type){
+    case 'approveUser':{
+      const data = shU.getDataRange().getValues();
+      for(let i=1;i<data.length;i++) if(data[i][0]===d.userid){ shU.getRange(i+1,7).setValue('approved'); break; }
+      break;
+    }
+    case 'deleteUser':{
+      const data = shU.getDataRange().getValues();
+      for(let i=1;i<data.length;i++) if(data[i][0]===d.userid){ shU.deleteRow(i+1); break; }
+      break;
+    }
+    case 'setPaymentStatus':{
+      const row = Number(d.rowIndex)+1; // +1 for header
+      shP.getRange(row+1,9).setValue(d.status); // Status col (I)
+      break;
+    }
+    case 'setRefundStatus':{
+      const row = Number(d.rowIndex)+1;
+      shR.getRange(row+1,8).setValue(d.status); // Status col (H)
+      break;
+    }
+    case 'setSetting':{
+      // search for key, else append
+      const data = shS.getDataRange().getValues(); let found=false;
+      for(let i=1;i<data.length;i++){ if(String(data[i][0])===String(d.key)){ shS.getRange(i+1,2).setValue(d.value); found=true; break; }}
+      if(!found){ shS.appendRow([d.key, d.value]); }
+      break;
+    }
+    default: return json({success:false,message:'Unknown admin update'});
+  }
+  return json({success:true,message:'Updated'});
+}

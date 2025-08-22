@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>FlexiMeal — Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page">
+    <h2>FlexiMeal — Admin</h2>
+    <div id="auth">
+      <p>Enter admin token:</p>
+      <input id="admintoken" placeholder="ADMIN_TOKEN">
+      <button id="btn-auth">Enter</button>
+      <div id="authmsg"></div>
+    </div>
+
+    <section id="panel" class="hidden">
+      <h3>Settings</h3>
+      <div id="settings"></div>
+      <div style="margin:8px 0">
+        <input id="set-key" placeholder="KEY (e.g., PRICE_BREAKFAST)">
+        <input id="set-val" placeholder="Value">
+        <button id="btn-set">Save Setting</button>
+      </div>
+
+      <h3>Users</h3>
+      <div id="users"></div>
+
+      <h3>Payments</h3>
+      <div id="payments"></div>
+
+      <h3>Refunds</h3>
+      <div id="refunds"></div>
+    </section>
+  </main>
+
+<script>
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyEdD54_HQE9rFbh-OjA5-b863v3SZkU8pQd8agzEbPmnyHCuG53zNO-hlxJMRCALbj/exec';
+const $ = s=>document.querySelector(s);
+const token = ()=>sessionStorage.getItem('flexi_admin_token')||'';
+
+$('#btn-auth').onclick = async ()=>{
+  const t=$('#admintoken').value.trim(); if(!t){$('#authmsg').innerText='Token required';return}
+  const ok = await post({action:'adminList', adminToken:t});
+  if(!ok.success){$('#authmsg').innerText=ok.message;return}
+  sessionStorage.setItem('flexi_admin_token', t);
+  $('#auth').classList.add('hidden');
+  $('#panel').classList.remove('hidden');
+  render(ok);
+}
+
+async function load(){
+  const r=await post({action:'adminList', adminToken:token()});
+  if(r.success) render(r); else alert(r.message);
+}
+
+function render(r){
+  $('#settings').innerHTML = Object.entries(r.settings).map(([k,v])=>`<div><b>${k}</b>: ${v}</div>`).join('');
+  $('#users').innerHTML = r.users.map(u=>`<div style="margin:6px 0">${u[0]} — ${u[1]} (${u[6]}) <button onclick="approve('${u[0]}')">Approve</button> <button onclick="delUser('${u[0]}')">Delete</button></div>`).join('');
+  $('#payments').innerHTML = r.payments.map(p=>{
+    const id=p[0], dt=p[1], uid=p[2], amt=p[4], utr=p[7], stat=p[8], upiTo=p[9];
+    return `<div style="margin:6px 0">#${id||''} ${uid} — ₹${amt} — ${stat} — UTR: ${utr||'-'} <button onclick="payStatus(${p._rowIndex},'verified')">Mark Verified</button></div>`
+  }).join('');
+  $('#refunds').innerHTML = r.refunds.map(f=>{
+    const rid=f._rowIndex, uid=f[1], meal=f[2], qty=f[3], each=f[4], email=f[5], status=f[6];
+    // UPI refund link to user's UPI (from Users list lookup happens in backend, but we can show a generic link here):
+    const upi = r.userUpiMap[uid] || '';
+    const upiHref = upi ? `upi://pay?pa=${encodeURIComponent(upi)}&pn=FlexiMeal%20Refund&am=${encodeURIComponent((qty*each).toFixed(2))}&tn=${encodeURIComponent('Refund '+uid)}` : '#';
+    return `<div style="margin:6px 0">#R${rid} ${uid} — ${meal} x${qty} @ ₹${each} — ${status}
+      <a href="${upiHref}">Refund Now</a>
+      <button onclick="refStatus(${rid},'available')">Make Available</button>
+      <button onclick="refStatus(${rid},'paid')">Mark Refunded (Paid)</button>
+    </div>`
+  }).join('');
+}
+
+async function approve(userid){ await post({action:'adminUpdate', type:'approveUser', userid, adminToken:token()}); load(); }
+async function delUser(userid){ await post({action:'adminUpdate', type:'deleteUser', userid, adminToken:token()}); load(); }
+async function payStatus(rowIndex,status){ await post({action:'adminUpdate', type:'setPaymentStatus', rowIndex, status, adminToken:token()}); load(); }
+async function refStatus(rowIndex,status){ await post({action:'adminUpdate', type:'setRefundStatus', rowIndex, status, adminToken:token()}); load(); }
+$('#btn-set').onclick = async ()=>{ await post({action:'adminUpdate', type:'setSetting', key:$('#set-key').value, value:$('#set-val').value, adminToken:token()}); load(); }
+
+async function post(payload){
+  const res = await fetch(SCRIPT_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  return res.json();
+}
+</script>
+</body>
+</html>
